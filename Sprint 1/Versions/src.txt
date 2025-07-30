@@ -1,0 +1,1485 @@
+#include <stdio.h>
+#include <stdlib.h>
+enum constants {
+    // passenger consts
+    MAX_NAME_LEN = 26,
+    MAX_STREET_LEN = 26,
+    MAX_CITY_LEN = 26,
+    MAX_PASSENGER = 20,
+    // seat matrix consts
+    MAX_SEATS = 4,
+    MAX_STRING = 25,
+    MAX_ROWS = 5,
+};
+
+const char col_labels[MAX_SEATS] = { 'A', 'B', 'C', 'D' };
+int passenger_code = 0;
+
+// Dstrucs
+// globals.c
+struct n_passenger {
+    int seatNumber; // 1D array
+    char name[MAX_NAME_LEN];
+    int age;
+    char street[MAX_STREET_LEN];
+    char city[MAX_CITY_LEN];    
+    int p_code;
+};
+
+struct n_seat {
+    int seatNumber; // 1D array
+    struct node* passenger;  // if (not taken) then (null or 0)    
+};
+
+struct flight_details {
+    char code[MAX_STRING];
+    char date[MAX_STRING];
+    char time[MAX_STRING];
+    char from[MAX_STRING];
+    char to[MAX_STRING];
+    char gate[MAX_STRING];
+    char boarding_time[MAX_STRING];
+};
+
+struct node { // node definition
+    struct n_passenger* passenger;
+    struct node* link; 
+};
+
+// node.c
+struct n_seat seatMatrix[MAX_PASSENGER] = {0};
+struct node* passenger_list = NULL;
+struct flight_details current_flight;
+
+
+
+// function prototypes
+// Linked List & Passenger Management
+int helper_copy(const char* o_string, char* buffer, int max_len);
+struct node* create_node();
+struct node* create_passenger(int seatNumber, char* name, int age, char* street, char* city);
+struct node* traverse_list(struct node* tempnode);
+void append_node(struct node** head, struct node* new_passenger);
+struct node* find_node(struct node** head, const int code);
+void remove_node(struct node** head, struct node* obj_address);
+
+// UI/Menu Functions
+void show_menu(int mode);
+void handle_passenger();
+int select_seat();
+int verify_seat(int seatNumber);
+void printTix(struct node* appended_passenger);
+void record_pass(struct node* head);
+int edit_seat();
+void cancel_seat(struct node** head, struct node* passenger, int seatNumber);
+int change_seat(struct node* passenger_1, int seatNumber_1, int seatNumber_2);
+int export_as_csv(struct flight_details* flight, struct node** list);
+int import_as_csv(struct flight_details* flight, struct node** list);
+// admin
+int reset_seats();
+void print_passenger_details(struct node** head);
+int change_flight_details();
+
+// Utility
+void printSeats();
+void init_seatMatrix ();
+int read_char_input(char* buffer, int max_len);
+int read_int_input(int* number);
+int seat_convert(char *temp_seat);
+int check_string_equality(const char* string_1, const char* string_2, int len);
+void init_flight_details();
+int reset_list();
+
+// Start of Function Definitions
+int helper_copy(const char* o_string, char* buffer, int max_len) {
+    int i = 0;
+    while (o_string[i] != '\0' && i < max_len - 1) {
+        buffer[i] = o_string[i];
+        i++;
+    }
+    buffer[i] = '\0';
+    return i;
+}
+
+struct node* create_node() { // objective: return a new allocated node object with initialized data
+    struct node* temp = (struct node *)malloc(sizeof(struct node));
+    if (temp == NULL) return NULL;
+    temp -> link = NULL;
+    return temp;
+}
+
+struct node* create_passenger(int seatNumber, char* name, int age, char* street, char* city) {
+    //edge case: any of the fields is missing
+    if (seatNumber < 0 ||
+        name == NULL ||
+        age < 0 ||
+        city == NULL ||
+        street == NULL ||
+        passenger_code < 0) return NULL;
+
+    struct node* new_passenger = create_node(); // create a node
+    if (new_passenger == NULL) return NULL;
+
+    //define and init new passenger
+    struct n_passenger* temp_passenger = (struct n_passenger *)malloc(sizeof(struct n_passenger));
+    if (temp_passenger == NULL) return NULL;
+    
+    // non-array members init
+    temp_passenger -> seatNumber = seatNumber;
+    temp_passenger -> age = age;
+    
+    if (passenger_code >= 0) passenger_code++;
+    temp_passenger -> p_code = passenger_code;
+    
+    // array-type members init
+    helper_copy(name, temp_passenger -> name, MAX_NAME_LEN);
+    helper_copy(city, temp_passenger -> city, MAX_CITY_LEN);
+    helper_copy(street, temp_passenger -> street, MAX_STREET_LEN);
+
+    // passenger init done; link node member: passenger to init passenger ptr
+    new_passenger -> passenger = temp_passenger;
+    seatMatrix[seatNumber].passenger = new_passenger;
+
+    // link is already NULL from creat_node()
+    // return new_passenger as a new node
+    return new_passenger;
+}
+
+struct node* traverse_list(struct node* tempnode) { // objective: return the address of the next node
+    if (tempnode -> link == NULL) return NULL;
+        return tempnode -> link;
+}
+
+void append_node(struct node** head, struct node* new_passenger) {
+    // edge case: empty list, allocate and append
+    if (*head == NULL) {
+        *head = create_node();
+        (*head) -> passenger = new_passenger->passenger;
+        return;
+    }
+
+    struct node* last_node = *head;
+    struct node* temp;
+
+    do { // loop traverse_node() till link == NULL; 
+        temp = traverse_list(last_node);
+        if (temp != NULL) last_node = temp;
+    } while (temp != NULL);
+
+    // last_node is now true
+    // connect new_node to last_node -> link
+
+    last_node -> link = new_passenger;
+}
+
+struct node* find_node(struct node** head, const int code) { // objective: traverse_list until NULL or current_node -> link  == find_node
+    if (*head == NULL) return NULL;
+    struct node* current_node = *head;
+
+    while(current_node != NULL) {
+        if (current_node -> passenger -> p_code == code) {
+            return current_node;
+        }
+        current_node = traverse_list(current_node);
+    } 
+        printf("Object not found");
+        return NULL;
+
+}
+
+void remove_node(struct node** head, struct node* obj_address) { // objective: traverse_list until NULL or current_node = obj_address
+    if (*head == NULL) return;
+
+    struct node* previous_node = *head;
+    struct node* current_node = *head;
+
+    while(current_node != NULL) {
+        if (current_node == obj_address) {
+            if (current_node == *head) {
+                *head = current_node -> link;
+            } else {
+                previous_node -> link = current_node -> link;
+            }
+            free(current_node->passenger);
+            free(current_node);
+            if (passenger_code > 0) passenger_code--;
+            return;
+        } 
+        previous_node = current_node;
+        current_node = traverse_list(current_node);
+    }  
+
+    printf("Object not found");
+    return;
+}
+
+int reset_list() {
+    if (passenger_list->link == NULL) {
+        remove_node(&passenger_list, passenger_list);
+        return 1;
+    }
+    struct node* current_node = passenger_list;
+
+    do {
+        remove_node(&passenger_list, current_node);
+        current_node = passenger_list; 
+    } while (current_node != NULL);
+    
+    return 1;
+}
+
+// CLI functions
+void handle_passenger() {
+    int choice_1;
+    do {
+        show_menu(3);
+        printf("\n  > enter choice : ");
+        choice_1 = -1;
+        read_int_input(&choice_1);
+
+        switch(choice_1) {
+            case 1: {
+                if(!select_seat()) printf(" error_1");
+                break;
+            }
+            case 2: {
+                if(!edit_seat()) printf(" error_2");
+                break;
+            }
+            case 3: {
+                return;
+                break;
+            }
+            default: {
+                printf("  > invalid input; press enter to try again\n");
+                getchar();
+            }
+        }
+    } while (1);
+}
+
+void handle_admin() {
+    int choice_1;
+    do {
+        show_menu(5);
+        printf("\n  > enter choice : ");
+        choice_1 = -1;
+        read_int_input(&choice_1);
+
+        switch(choice_1) {
+            case 1: {
+                if(!reset_seats()) {
+                    printf(" error_1");
+                } else {
+                    printf("\n  [ADMIN OPERATION] : Reset Seats\n");
+                    printf("\n  | Seats succesfully replenished\n");
+                    printf("  | Current Passenger Count: [%d/%d]\n", passenger_code, MAX_PASSENGER);
+                    printf("  > press enter to continue\n");
+                    getchar();
+                }
+                break;
+            }
+            case 2: {
+                printf("\n  [ADMIN OPERATION] : Reset Seats\n");
+                printf("\n  | Printing [%d/%d] seats\n\n", passenger_code, MAX_PASSENGER);
+                print_passenger_details(&passenger_list);
+                break;
+            }
+            case 3: {
+                printf("\n  [ADMIN OPERATION] : Change Flight Details");
+                if(!change_flight_details()) printf(" error_2");
+                break;
+            }
+            case 4: {
+                if(!export_as_csv(&current_flight, &passenger_list)) printf(" error_2");
+                break;
+            }
+            case 5: {
+                return;
+                break;
+            }
+            default: {
+                printf("  > invalid input; press enter to try again\n");
+                getchar();
+            }
+        }
+    } while (1);
+
+}
+
+int select_seat() {
+    if (passenger_code == 20) {
+      printf("\n\n  -----------------------------------------------");
+        printf("\n  [ ! ] Notice: Cannot Select/Reserve a new seat; ");
+        printf("\n        Seat Capacity Full! [ %d/%d ]              ", passenger_code, MAX_PASSENGER);
+        printf("\n\n        Either;\n        - Passengers must CANCEL seats\n        - Admin Module must RESET seats");
+        printf("\n  -----------------------------------------------\n");
+        printf("\n  > press enter to continue\n");
+        getchar();
+        return 1;
+    }
+    // define and init passenger variables
+    int seatNumber = 0;
+    char name [MAX_NAME_LEN] = {0};
+    int age;
+    char street[MAX_STREET_LEN] = {0};
+    char city[MAX_CITY_LEN] = {0};
+    int choice_2;
+    // select a seat
+    do {
+        do {
+            char temp_seat[3] = {0};
+            printSeats(1);
+            printf("\n  [SEAT SELECTION]: please select a seat");
+            printf("\n\n  FORMAT: [row number, collumn letter], 0 to return: ");
+            printf("\n\n  > select a seat: ");
+            read_char_input(temp_seat, 2);
+
+            if(temp_seat[0] == '0') return 1;   
+
+            if ((temp_seat[0] >= '1' && temp_seat[0] <= '5') && // if correct row number
+            ((temp_seat [1] >= 'A' && temp_seat[1] <= 'D') || (temp_seat[1] >= 'a' && temp_seat[1] <= 'd'))) { // if correct col letter
+                seatNumber = seat_convert(temp_seat);
+                // verify
+                printf("\n  ooo verifying if seat[%c%c] is free...", temp_seat[0], temp_seat[1]);
+
+                if (verify_seat(seatNumber)) {
+                    printf("\n  ooo selecting seat [%c%c]", temp_seat[0], temp_seat[1]);
+                    printf("\n\n  ---------------------------");
+                    printf("\n  YOU HAVE SELECTED SEAT [%c%c]", temp_seat[0], temp_seat[1]);
+                    printf("\n  ---------------------------");
+                    printf("\n  press enter to continue;");
+                    getchar();
+                    break;
+                } else {
+                    int choice_1;
+                    printf("\n  ooo double-checking seat [%c%c]", temp_seat[0], temp_seat[1]);
+                    printf("\n\n  -------------------------------");
+                    printf("\n  [!] SEAT [%c%c] IS ALREADY TAKEN!", temp_seat[0], temp_seat[1]);
+                    printf("\n  -------------------------------");
+                    printf("\n  [1] pick another seat\n  [2] back");
+                    printf("\n\n  > enter choice: ");
+                    choice_1 = -1;
+                    read_int_input(&choice_1);
+                        switch(choice_1) {
+                            case 1:{
+                                break;
+                            }
+                            case 2:{
+                                return 1;
+                                break;
+                            }
+                            default:{
+                                printf("\n  > invalid input; press enter to try again\n");
+                                getchar();
+                            }
+                        }
+                }
+            } else {
+                printf("  > invalid input; please only enter numbers (1-5) or letters (A-D) in the format [seat row number, seat collumn letter]\n");
+                getchar();
+            }
+    } while (1);
+        printf("\n  [PASSENGER DATA FORM]: please fill out the following fields\n\n"); // Passenger Data
+        printf("  |  %-10s: ", "NAME");
+        read_char_input(name, MAX_NAME_LEN);
+        printf("  |  %-10s: ", "AGE");
+        read_int_input(&age);
+        printf("  |  %-10s: ", "STREET");
+        read_char_input(street, MAX_STREET_LEN);
+        printf("  |  %-10s: ", "CITY");
+        read_char_input(city, MAX_CITY_LEN);
+    
+        struct node* new_passenger = create_passenger(seatNumber, name, age, street, city); // record in list
+        append_node(&passenger_list, new_passenger); 
+        struct node* appended_passenger = find_node(&passenger_list, new_passenger->passenger->p_code); // test
+            // check!
+                printf("\n  %-6s\t%-26s\t%-4s\t%-26s\t%-26s\t%-5s\n", "Seat Number", "Name", "Age", "Street", "City", "Ref No");
+                printf("  %-6d\t%-26s\t%-4d\t%-26s\t%-26s\t%-5d\n",appended_passenger->passenger->seatNumber, appended_passenger->passenger->name, appended_passenger->passenger->age, appended_passenger->passenger->street, appended_passenger->passenger->city, appended_passenger->passenger->p_code);         
+                getchar();
+            // check!
+        // print in file
+        record_pass(passenger_list);
+        printTix(appended_passenger);
+        printSeats(0);
+    // prompt to select seat again or return
+    printf("\n  [1] pick another seat\n  [2] back");
+    printf("\n\n  > enter choice: ");
+    choice_2 = -1;
+    read_int_input(&choice_2);
+        
+        switch(choice_2) {
+            case 1:{
+                break;
+            }
+            case 2:{
+                return 1;
+                break;
+            }
+            default:{
+                printf("\n  > invalid input; press enter to try again\n");
+                getchar();
+            }
+        }
+    } while (1);
+}
+
+int edit_seat() {
+    if (passenger_code == 0) {
+      printf("\n\n  -----------------------------------------------");
+        printf("\n  [ ! ] Notice: Cannot Edit(Cancel/Change) seats; ");
+        printf("\n        Seat Capacity is empty! [ %d/%d ]              ", passenger_code, MAX_PASSENGER);
+        printf("\n\n        - Passengers must start SELECTING/\n        RESERVING seats, so there are seats\n        eligible to edit");
+        printf("\n  -----------------------------------------------\n");
+        printf("\n  > press enter to continue\n");
+        getchar();
+        return 1;
+    }
+
+    int choice_1;
+    int choice_2;
+    char choice_3;
+    int flag_1;
+    
+    do { // repeat entire process from start
+        char temp_seat[3] = {0};
+        char name[MAX_NAME_LEN] = {0};
+        flag_1 == 1;
+        int seatNumber = 0;
+        do {
+            printSeats(1);
+            printf("\n  [SEAT IDENTIFICATION]: before cancelling or changing seats, please identify a seat to modify");
+            printf("\n\n  FORMAT: [row number, collumn letter], 0 to return: ");
+            printf("\n\n  > Seat Number: ");
+            read_char_input(temp_seat, 2);
+
+            // CHECK IF SEAT, CONVERT TO SEAT NUMBER, CHECK IF THERES A PASSENGER
+                if(temp_seat[0] == '0') return 1;   
+
+                if ((temp_seat[0] >= '1' && temp_seat[0] <= '5') && // if correct row number
+                ((temp_seat [1] >= 'A' && temp_seat[1] <= 'D') || (temp_seat[1] >= 'a' && temp_seat[1] <= 'd'))) { // if correct col letter
+                    seatNumber = seat_convert(temp_seat);
+
+                    printf("\n\n  ooo verifying validity of the seat [%s]", temp_seat);
+                    
+                    if (seatMatrix[seatNumber].passenger == NULL) {
+                        printf("\n  ooo seat is not taken; not a eligible for seat cancellation/change");
+                        printf("\n  ooo seat [%-2s] could not be verified; press enter to try again", temp_seat);
+                        getchar();
+                    } else {
+                        printf("\n  ooo seat is taken; verify passenger first before modifying\n");
+                        printf("\n  > Name of Passenger in Seat [%s]: ", temp_seat);
+                        read_char_input(name, 25);
+
+                        if (check_string_equality(seatMatrix[seatNumber].passenger->passenger->name, name, MAX_NAME_LEN)) {
+                            show_menu(4);
+                            printf("\n  ooo seat verified!");
+                            printf("\n  >> CURRENT SEAT IN CONSIDERATION [%s]\n", temp_seat);
+                            printf("\n  > enter your choice: ");
+                            read_int_input(&choice_1);
+                                switch(choice_1) {
+                                    case 1: {
+                                        printf("\n  [SEAT CANCEL]; do you want to proceed with cancelling your seat? This will free the selected seat.");
+                                        printf("\n  : [Y] Yes [N] No");
+                                        printf("\n\n  > enter choice : ");
+                                        choice_3 = '\0';                                        
+                                        read_char_input(&choice_3, 1);
+                                        
+                                        if (choice_3 == 'N' || choice_3 == 'n') break;
+                                        struct node* selected_seat = find_node(&passenger_list, seatMatrix[seatNumber].passenger->passenger->p_code);
+                                        cancel_seat(&passenger_list, selected_seat, selected_seat->passenger->p_code);
+                                        printSeats(0);
+                                        record_pass(passenger_list);
+                                            printf("\n\n  ---------------------------");
+                                            printf("\n  YOU HAVE CANCELLED SEAT [%s]", temp_seat);
+                                            printf("\n  ---------------------------");
+                                        flag_1 = 0;
+                                        break;
+                                    }
+                                    case 2:{
+                                        char temp_seat2[3] = {0};
+                                        int flag_2 = 1;
+                                        int seatNumber_2;
+                                        do {
+                                            printSeats(1);
+                                           
+                                            printf("\n  Enter the seat you want to change to: ");
+                                            printf("\n  [ ! ] Seat to change to MUST be free");
+                                            printf("\n\n  FORMAT: [row number, collumn letter], 0 to return: ");
+                                            printf("\n\n  > Seat Number: ");
+                                                read_char_input(temp_seat2, 2);
+                                                if(temp_seat2[0] == '0') return 1;
+                                            if ((temp_seat2[0] >= '1' && temp_seat2[0] <= '5') && // if correct row number
+                                                ((temp_seat2[1] >= 'A' && temp_seat2[1] <= 'D') || (temp_seat2[1] >= 'a' && temp_seat2[1] <= 'd'))) {
+                                                seatNumber_2 = seat_convert(temp_seat2);
+
+                                                printf("\n\n  ooo verifying validity of the seat [%s]", temp_seat2);
+
+                                                if (seatMatrix[seatNumber_2].passenger == NULL) {
+                                                    printf("\n  ooo seat [%s] is not taken; eligible for seat change", temp_seat2);
+                                                    printf("\n  [SEAT CHANGE]; do you want to proceed with changing your seat? This will free your previous seat and occupy the new seat");
+                                                    printf("\n  : [Y] Yes [N] No");
+                                                    printf("\n\n  > enter choice : ");
+                                                    choice_3 = '\0';                                        
+                                                    read_char_input(&choice_3, 1);
+                                                    if (choice_3 == 'N' || choice_3 == 'n') break;
+
+                                                    struct node* selected_seat = find_node(&passenger_list, seatMatrix[seatNumber].passenger->passenger->p_code);
+                                                    if(change_seat(selected_seat, selected_seat->passenger->seatNumber, seatNumber_2)) {
+                                                        printSeats(0);
+                                                        record_pass(passenger_list);
+                                                        printf("\n\n  ----------------------------------------");
+                                                        printf("\n  YOU HAVE CHANGED SEATS FROM [%s] to [%s]", temp_seat, temp_seat2);
+                                                        printf("\n  ----------------------------------------");
+                                                        flag_1 = 0;
+                                                        flag_2 = 0;
+                                                    } else {
+                                                        printf("\n  [ ! ] Could not process seat change request, press enter to try again");
+                                                        getchar();
+                                                    }
+                                                } else {
+                                                    printf("\n  > ooo seat [%s] is taken; ineligible for seat change", temp_seat2);
+                                                    printf("\n  > press enter to try again");
+                                                    getchar();
+                                                }
+                                            } else {
+                                                printf("  > invalid input or not a real seat; try again with proper format");
+                                                printf("\n  > press enter to try again");
+                                                getchar();
+                                            }
+                                        } while (flag_2 == 1);
+                                        break;
+                                    }
+                                    default: {
+                                        printf("  > invalid input; press enter to try again\n");
+                                        getchar();
+                                    }
+                                } // switch
+
+                        } else {
+                            printf("\n  ooo seat unverified; name mismatch!");
+                            printf("\n  > press enter to go back to menu");
+                            getchar();
+                        }    // block for if name and seatmatrix name is equal 
+                        
+                    } // block for if seat is taken/exists
+                } else {
+                    printf("  > invalid input or not a real seat; try again with proper format");
+                    printf("\n  > press enter to try again");
+                    getchar();
+                } // block for if seat is valid/ a real seat
+        } while (flag_1 == 1); 
+        
+        printf("\n  [1] edit another seat\n  [2] back"); //edit another seat?
+        printf("\n\n  > enter choice: ");
+        choice_2 = -1;
+        read_int_input(&choice_2);
+        switch(choice_2) {
+            case 1:{
+                break;
+            }
+            case 2:{
+                return 1;
+                break;
+            }
+            default:{
+            printf("\n  > invalid input; press enter to try again\n");
+            getchar();
+            }
+        }
+    } while (1);
+    return 1;
+}
+
+void cancel_seat(struct node** head, struct node* passenger,int seatNumber) {
+    remove_node(head, passenger);
+    seatMatrix[seatNumber].passenger = NULL;
+}
+
+int change_seat(struct node* passenger_1, int seatNumber_1, int seatNumber_2) {
+    int temp_seat_number;
+    struct node* temp_passenger_holder;
+
+    // move seat numbers
+    passenger_1->passenger->seatNumber = seatNumber_2;
+
+    // move seat matrix passengers
+    seatMatrix[seatNumber_2].passenger = passenger_1; // move seat
+    seatMatrix[seatNumber_1].passenger = NULL; // uninitialize the previous
+
+    if (passenger_1->passenger->seatNumber == seatNumber_2 && // if seat number is changed accordingly
+        seatMatrix[seatNumber_2].passenger == passenger_1 && // and if new seat contains the passenger
+        seatMatrix[seatNumber_1].passenger == NULL) // and if old seat contains nothing anymore
+    {
+        return 1; // then 1 == true
+    } else {
+        return 0;
+    }
+}
+
+int verify_seat(int seatNumber) {
+    if (seatMatrix[seatNumber].passenger == NULL) {
+        return 1;
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
+void record_pass(struct node* head) {
+    FILE* stream;
+    struct node* current_node = head;
+    char seat_matrix_not[3] = {0};
+    stream = fopen("plist.txt", "w");
+    if (stream == NULL) {
+        printf("Error_ record_pass");
+        return;
+    }
+    
+    fprintf(stream,"\n  =========================\n");
+    fprintf(stream,"    AIRLINE FLIGHT REPORT\n");
+    fprintf(stream,"  =========================\n");
+    fprintf(stream,"\n  %-20s:\t %-20s", "Carrier", "Small Airplane"); //tentative
+    fprintf(stream,"\n  %-20s:\t %-20s", "Flight no.", current_flight.code);
+    fprintf(stream,"\n  %-20s:\t %-20s", "Flight Date", current_flight.date);
+    fprintf(stream,"\n  %-20s:\t %-20s", "Report Time", current_flight.time);
+    fprintf(stream,"\n  %-20s:\t %-5d", "Seats Total", MAX_PASSENGER);
+    fprintf(stream,"\n  %-20s:\t %-5d", "Seats Occupied", passenger_code);
+    fprintf(stream,"\n  %-20s:\t %-5d", "Seats Available", MAX_PASSENGER - passenger_code);
+    fprintf(stream,"\n");
+    fprintf(stream,"\n  -------------------------------------");
+    fprintf(stream,"\n  \tPASSENGER MASTERLIST");
+    fprintf(stream,"\n  -------------------------------------");
+    fprintf(stream,"\n");
+    fprintf(stream,"\n  | %-5s | %-8s | %-25s | %-5s | %-50s  |", "No.", "Seat" ,"Passenger Name", "Age", "Home Address");
+    fprintf(stream,"\n  | %-5s | %-8s | %-25s | %-5s | %-50s  |", "-----", "--------" ,"-------------------------", "-----", "--------------------------------------------------");
+    if (current_node != NULL) {
+        for (int i = 0; i < passenger_code; i++) {
+        char concatenated_address[51] = {0};
+        int j = 0;
+        int l = 0;
+        while((current_node->passenger->street[j]) != '\0') {
+            concatenated_address[j] = current_node->passenger->street[j];
+            j++;
+        }
+            concatenated_address[j] = ',';
+            j++;
+            concatenated_address[j] = ' ';
+            j++;
+        while((current_node->passenger->city[l]) != '\0') {
+            concatenated_address[j] = current_node->passenger->city[l];
+            j++;
+            l++;
+        }
+            concatenated_address[j] = '\0';
+        seat_matrix_not[0] = ((int)((current_node->passenger->seatNumber)/MAX_SEATS)) + '1';
+        seat_matrix_not[1] = ((int)((current_node->passenger->seatNumber) % MAX_SEATS)) + 'A';
+        
+        fprintf(stream,"\n  | %-5d | %-8s | %-25s | %-5d | %-51s |", current_node->passenger->p_code, seat_matrix_not, current_node->passenger->name, current_node->passenger->age, concatenated_address);
+        current_node = traverse_list(current_node);
+        }
+    } else {
+        fprintf(stream,"\n  | %-5s | %-8s | %-25s | %-5s | %-51s |", "NULL", "NULL", "No Passengers yet", "NULL", "NULL" );
+    }
+    fprintf(stream,"\n\n");
+    fprintf(stream, "  -------------------------------------\n");
+    fprintf(stream, "            SEATING LAYOUT\n");
+    fprintf(stream, "  -------------------------------------\n");
+    fprintf(stream, "\n");
+    fprintf(stream, "    +------------------------------+\n");
+    fprintf(stream, "    |   Left      Hall     Right   |\n");
+    int temp_seatNumber;
+    for(int i = 0; i < 5; i++) {
+        fprintf(stream,"  %d |", i + 1);
+        for(int j = 0; j < 4; j++) {
+            temp_seatNumber = (i*MAX_SEATS) + j;
+            if (seatMatrix[temp_seatNumber].passenger != NULL) {
+                fprintf(stream, " [ X ] ");
+            } else {
+                fprintf(stream, " [ %c ] ", col_labels[j]);
+            }
+            if (j == 1) fprintf(stream, "  ");
+            if (j == 3) fprintf(stream, "|");
+        }
+        fprintf(stream, "\n    |                              |\n");
+        
+    }
+        fprintf(stream,"\n\n  --------------------------------------------------------------------\n");
+        fprintf(stream,"  |  Description : This machine project is an Airline Seat Operator  |\n");
+        fprintf(stream,"  |  Author : Sean Russell B. Villeza                                |\n");
+        fprintf(stream,"  |  Section : 1-5                                                   |\n");
+        fprintf(stream,"  |  Last Modified : 05/29/2025                                      |\n");
+        fprintf(stream,"  |  Acknowledgments: Submitted to sir Arnie Fabregas                |\n");
+        fprintf(stream,"  --------------------------------------------------------------------\n");
+        
+    fclose(stream);
+}
+
+void printTix(struct node* appended_passenger) {
+    char seat_matrix_not[3] = {0};
+        seat_matrix_not[0] = ((int)((appended_passenger->passenger->seatNumber)/MAX_SEATS)) + '1';
+        seat_matrix_not[1] = ((int)((appended_passenger->passenger->seatNumber) % MAX_SEATS)) + 'A';
+
+                printf("\n  ----------------------------------------------------\n");
+                printf("  |     TICKET                                       |\n");
+                printf("  |                                                  |\n");
+                printf("  |     Flight      : %-25s      |\n", current_flight.code);
+                printf("  |     Seat Number : %-25s      |\n", seat_matrix_not);
+                printf("  |     Passenger   : %-25s      |\n", appended_passenger->passenger->name);
+                printf("  |     Date        : %-25s      |\n", current_flight.date);
+                printf("  |     Time        : %-25s      |\n", current_flight.time );
+                printf("  |--------------------------------------------------|\n");
+                printf("  |     From        : %-25s      |\n", current_flight.from);
+                printf("  |     To          : %-25s      |\n", current_flight.to);
+                printf("  |     Gate        : %-25s      |\n", current_flight.gate);
+                printf("  |     Boarding    : %-25s      |\n", current_flight.boarding_time);
+                printf("  |                                                  |\n");
+                printf("  ----------------------------------------------------\n");
+                printf("  > Press enter to continue");
+                getchar();
+}
+
+// ADMIN COMMANDS
+int reset_seats() {
+    if (passenger_code == 0) {
+        printf("\n  [ ! ] No Passenger Detected\n        Current Passenger Count: [%d/%d]\n        CANNOT RESET SEATS\n", passenger_code, MAX_PASSENGER);
+        printf("\n  > press enter to continue");
+        getchar();
+        return 0;
+    }
+    // clear seatMatrix 
+    init_seatMatrix();
+    // clear passenger_list
+    if (reset_list()) {
+        return 1;    
+    } else {
+        return 0;
+    }
+}
+
+void print_passenger_details(struct node** head) {
+    struct node* current_node = *head;
+    printf("    {");
+    printf("\n      \"passengers\":[ \n");
+
+    char seatcode[3] = {0};
+
+    for(int i = 0; i < passenger_code; i++) {
+    seatcode[0] = ((int)((current_node->passenger->seatNumber)/MAX_SEATS)) + '1';
+    seatcode[1] = ((int)((current_node->passenger->seatNumber) % MAX_SEATS)) + 'A';
+      printf("        {\n");
+      printf("          \"seatnumber\": %d\n", current_node->passenger->seatNumber);
+      printf("          \"seatcode\": %s\n", seatcode);
+      printf("          \"name\": %s\n", current_node->passenger->name);
+      printf("          \"age\": %d\n", current_node->passenger->age);
+      printf("          \"street\": %s\n", current_node->passenger->street);
+      printf("          \"city\": %s\n", current_node->passenger->city);
+      printf("          \"passenger_code\": %d\n", current_node->passenger->p_code);
+      printf("        },\n");
+      current_node = current_node->link;
+    }
+
+    printf("      ]\n");
+    printf("    }\n");
+    printf("\n  [%d/%d] Passenger Details Printed\n", passenger_code, MAX_PASSENGER);
+    printf("  > press enter to return;");
+    getchar();
+}
+
+int change_flight_details() {
+    int choice_1;
+    do {
+        printf("\n  > Pick a Field to edit;\n");
+                printf("\n  [1] Flight Code");
+                printf("\n  [2] Flight Date");
+                printf("\n  [3] City Code Origin");
+                printf("\n  [4] City Code Destination");
+                printf("\n  [5] Gate Number");
+                printf("\n  [6] Boarding Time");
+                printf("\n  [7] Back\n");
+        printf("\n  > enter choice : ");
+        choice_1 = -1;
+        read_int_input(&choice_1);
+
+        switch (choice_1){
+            case 1: {
+                printf("\n  > enter new flight code [5 Characters]: ");
+                read_char_input(current_flight.code, MAX_STRING);
+                printf("\n  Field updated: [Flight Code] -> [%s]\n",current_flight.code);
+                printf("  > press enter to continue");
+                getchar();
+                break;
+            }
+            case 2: {
+                printf("\n  > enter new date in the format YYYY-MM-DD: ");
+                read_char_input(current_flight.date, MAX_STRING);
+                printf("\n  Field updated: [Flight Date] -> [%s]\n",current_flight.date);
+                printf("  > press enter to continue");
+                getchar();
+                break;
+            }
+            case 3: {
+                printf("\n  > enter flight city of origin (ex. MNL for Manila): ");
+                read_char_input(current_flight.from, MAX_STRING);
+                printf("\n  Field updated: [Flight Origin] -> [%s]\n",current_flight.from);
+                printf("  > press enter to continue");
+                getchar();
+                break;
+            }
+            case 4: {
+                printf("\n  > enter flight city of destination (ex. MNL for Manila): ");
+                read_char_input(current_flight.to, MAX_STRING);
+                printf("\n  Field updated: [Flight Destination] -> [%s]\n",current_flight.to);
+                printf("  > press enter to continue");
+                getchar();
+                break;
+            }
+            case 5: {
+                printf("\n  > enter the new gate number of boarding: ");
+                read_char_input(current_flight.gate, MAX_STRING);
+                printf("\n  Field updated: [Flight Gate Number] -> [%s]\n",current_flight.gate);
+                printf("  > press enter to continue");
+                getchar();
+                break;
+            }
+            case 6: {
+                printf("\n  > enter the new boarding-time for this flight in the format (HH:MM AM/PM): ");
+                read_char_input(current_flight.boarding_time, MAX_STRING);
+                printf("\n  Field updated: [Flight Boarding Time] -> [%s]\n",current_flight.boarding_time);
+                printf("  > press enter to continue");
+                getchar();
+                break;
+            }
+            case 7: {
+                return 1;
+                break;
+            }
+            default: {
+                printf("  > invalid input; press enter to try again\n");
+                getchar();
+            }   
+        }
+
+        printf("\n  [1] Change another field\n  [2] Back\n");
+        printf("\n  > enter choice : ");
+        choice_1 = -1;
+        read_int_input(&choice_1);
+            switch (choice_1) {
+                case 1: {
+                    break;
+                }
+                case 2: {
+                    return 1;
+                    break;
+                }
+                default: {
+                printf("  > invalid input; press enter to try again\n");
+                getchar();
+                }  
+            }
+    } while (1);
+}
+
+int export_as_csv(struct flight_details* flight, struct node** list) {
+
+    if (passenger_code == 0) { // handle base_case passenger_code = 0
+        printf("\n  -----------------------------------------");
+        printf("\n  [ ! ] Export Session as CSV Failed");
+        printf("\n        [%d/%d] passengers are in the plane", passenger_code, MAX_PASSENGER);
+        printf("\n        nothing to record");
+        printf("\n  -----------------------------------------");
+        printf("\n  > press enter to return");
+        getchar();
+        return 1;
+    }
+
+    char file_name[MAX_STRING + 4] = {0}; // init variables
+    char file_suffix[] = ".csv";
+    char file_signature[] = "COMP003";
+    int MAX_CSV_FILENAME = MAX_STRING + 4;
+    struct node* current_node;
+    current_node = passenger_list;
+    int count = 0;
+    int file_name_index = 0;
+    printf("\n  [ADMIN OPERATION] : Export Session as CSV file");
+    printf("\n  Input Field: Provide a filename for your CSV\n  format: [Maximum 25 Characters long] (ex. ThisisAFileName)");
+    printf("\n\n  > enter file name: "); // prompt for file_name input 
+    read_char_input(file_name, MAX_CSV_FILENAME - 3);
+    while(file_name_index != MAX_STRING) {
+        if (file_name[file_name_index] == '\0') {
+            for(int i = 0; i < 4; i++) {
+                file_name[file_name_index] = file_suffix[i]; // append.csv
+                file_name_index++;
+            }
+            file_name[file_name_index] = '\0';
+            break;
+        }
+        file_name_index++;
+    }
+
+    FILE* fptr_1;
+    fptr_1 = fopen(file_name, "w"); // open file ptr
+        if (fptr_1 == NULL) { // null ptr catch
+            return 0;
+        }
+    fprintf(fptr_1, "%s,%s,%s,%s,%s,%s,%s,%s\n",file_signature, flight->code, flight->date, flight->time, flight->from,flight->to,flight->gate,flight->boarding_time);
+    while (current_node != NULL) {
+        printf("  ooo exporting passenger [%d]\n", count + 1);
+        fprintf(fptr_1, "%d,%s,%d,%s,%s,%d\n", current_node->passenger->seatNumber, current_node->passenger->name, current_node->passenger->age, current_node->passenger->street, current_node->passenger->city, current_node->passenger->p_code); // passenger details
+        current_node = traverse_list(current_node);
+        count++;
+    }
+
+    fclose(fptr_1);
+    return 1;
+}
+
+int import_as_csv(struct flight_details* flight, struct node** list) {
+    // data_init
+    int MAX_CSV_FILENAME = MAX_STRING + 4, index = 0;
+    char file_name[MAX_STRING + 4] = {0}; // init variables
+    char file_suffix[] = ".csv";
+    int choice_1;
+    FILE* fptr_1; // open file; case if not
+
+    do {
+        printf("\n  [ ! ] You are importing a session via a CSV file\n"); // prompt for filename
+        printf("\n  File must be in the same directory | only enter file NAME (exclude .csv)");
+        printf("\n  Filenames are not case sensitive (e.g filename == FILENAME)");
+        printf("\n\n  > enter file name to import session: ");
+        read_char_input(file_name, MAX_STRING);
+
+        while (index < MAX_STRING) { //append csv
+            if (file_name[index] == '\0') {
+                for(int i = 0; i < 4; i++) {
+                    file_name[index] = file_suffix[i];
+                    index++;
+                }
+                file_name[index] = '\0';
+                break;
+            }
+            index++;
+        }
+
+        fptr_1 = fopen(file_name, "r");
+        printf("\n  ooo Opening file [%s]", file_name);
+        if (fptr_1 == NULL) {
+            printf("\n\n  [ ! ] The file %s does not exist with the program inside its file folder/directory", file_name);
+            printf("\n  [1] Enter a new file name\n  [2] Back\n");
+            choice_1 = -1;
+            read_int_input(&choice_1);
+
+            switch (choice_1) { // failed, give choices to repeat or return
+                case 1: {
+                    break;
+                }   
+                case 2: {
+                    return 1;
+                    break;
+                }
+                default: {
+                    printf("  > invalid input; press enter to try again\n");
+                    getchar();
+                }  
+            }
+        } else {
+            break; // continue to parsing
+        }
+    } while (1);
+        
+    int ptr_line = 0;
+    // flight_details
+    {
+        char flight_details_buffer[190] = {0};
+        int field = 0; 
+        int i = 0;
+        char signature[] = "COMP003";
+        fgets(flight_details_buffer, sizeof(flight_details_buffer), fptr_1); // read first line
+        ptr_line++;
+        printf("\n\n  String inputted to Buffer, line [%d]: %s\n",ptr_line, flight_details_buffer);
+
+        // parse loop
+        while (field < 8) {
+            int buffer_index = 0;
+            char buffer[MAX_STRING + 1] = {0};
+            while(flight_details_buffer[i] != '\n' && flight_details_buffer[i] != ',') {
+                buffer[buffer_index] = flight_details_buffer[i];
+                i++;
+                buffer_index++;
+            }
+            printf("  ooo parsed field [%d] = [%s]\n", field, buffer);
+
+                int j = 0;
+
+                switch(field) {
+                    case 0: {
+                        if (check_string_equality(buffer, signature, sizeof(signature)/sizeof(signature[0]))) {
+                            printf("  ooo verification flag [%s] found\n", signature);
+                        } else {
+                            printf("  ooo verification flag [%s] NOT found\n", signature);
+                            printf("\n  [ ! ] File [%s] not eligible for this program\n", file_name);
+                            printf("  > press enter to return\n");
+                            getchar();
+                        }
+                        break;
+                    }
+                    case 1: {
+                        while(buffer[j] != '\0') {
+                            flight->code[j] = buffer[j];
+                            j++;
+                        }
+                        printf("  ooo flight_code parsed\n");
+                        break;
+                    }
+                    case 2: {
+                         while(buffer[j] != '\0') {
+                            flight->date[j] = buffer[j];
+                            j++;
+                        }
+                        printf("  ooo flight_date parsed\n");
+                        break;
+                    }
+                    case 3: {
+                         while(buffer[j] != '\0') {
+                            flight->time[j] = buffer[j];
+                            j++;
+                        }
+                        printf("  ooo flight_time parsed\n");
+                        break;
+                    }
+                    case 4: {
+                         while(buffer[j] != '\0') {
+                            flight->from[j] = buffer[j];
+                            j++;
+                        }
+                        printf("  ooo flight_origin parsed\n");
+                        break; 
+                    }
+                    case 5: {
+                         while(buffer[j] != '\0') {
+                            flight->to[j] = buffer[j];
+                            j++;
+                        }
+                        printf("  ooo flight_destination parsed\n");
+                        break;
+                    }
+                    case 6: {
+                         while(buffer[j] != '\0') {
+                            flight->gate[j] = buffer[j];
+                            j++;
+                        }
+                        printf("  ooo flight_gate parsed\n");
+                        break;
+                    }
+                    case 7: {
+                         while(buffer[j] != '\0') {
+                            flight->boarding_time[j] = buffer[j];
+                            j++;
+                        }
+                        printf("  ooo flight_boarding_time parsed\n");
+                        break;
+                    }
+                }
+                field++;
+                i++;
+        }
+
+        printf("  [ ! ] %s flight_details successfully parsed\n", file_name);
+    }
+
+    // passenger_details
+    { 
+        while (1) {
+            char passenger_details_buffer[95] = {0};
+            int field = 0; 
+            int i = 0;
+
+            if(fgets(passenger_details_buffer, sizeof(passenger_details_buffer), fptr_1) != NULL) { // read first line
+                ptr_line++;
+                printf("\n\n  String inputted to Buffer, line [%d]: %s\n",ptr_line, passenger_details_buffer);
+
+                int seatNumber = 0;
+                char name [MAX_NAME_LEN] = {0};
+                int age = 0;
+                char street [MAX_STREET_LEN] = {0};
+                char city[MAX_CITY_LEN] = {0};
+                int pass_code = 0;
+
+                // parsing
+                while (field < 6) {
+                    int b_index = 0;
+                    char buffer[MAX_STRING + 1] = {0};
+
+                    while (passenger_details_buffer[i] != ',' && passenger_details_buffer[i] != '\n') {
+                            buffer[b_index] = passenger_details_buffer[i];
+                            i++;
+                            b_index++;
+                        }
+
+                        printf("  ooo parsed field [%d] = [%s]\n", field, buffer);
+
+                    int j = 0;
+                    if (field == 0 || field == 2 || field == 5) { // integers
+                            char *endptr;
+                            int converted_int = strtol(buffer, &endptr, 10);
+
+                        switch(field) {
+                            case 0: {
+                                seatNumber = converted_int;
+                                break;
+                            }
+                            case 2: {
+                                age = converted_int;
+                                break;
+                            }
+                            case 5: {
+                                pass_code = converted_int;
+                                break;
+                            }
+                        }
+                    } else {
+                        switch(field) { // strings
+                            case 1: {
+                                while(buffer[j] != '\0') {
+                                    name[j] = buffer[j];
+                                    j++;
+                                }
+                                break;
+                            }
+                            case 3: {
+                                while(buffer[j] != '\0') {
+                                    street[j] = buffer[j];
+                                    j++;
+                                }
+                                break;
+                            }
+                            case 4: {
+                                while(buffer[j] != '\0') {
+                                    city[j] = buffer[j];
+                                    j++;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    field++;
+                    i++;
+                }
+
+                struct node* new_passenger = create_passenger(seatNumber, name, age, street, city); // record in list
+                append_node(list, new_passenger); 
+                struct node* appended_passenger = find_node(list, new_passenger->passenger->p_code); // test
+                appended_passenger->passenger->p_code = pass_code;
+
+            } else {
+                break;
+            }
+        }
+    }
+
+    record_pass(passenger_list);
+    fclose(fptr_1);
+
+    printf("\n  --------------------------------------");
+    printf("\n  [ ! ] Flight [%s] Session Restored !", flight->code);
+    printf("\n  --------------------------------------\n");
+    getchar();
+    return 1;
+    
+}
+
+
+
+// Utility
+void printSeats(int mode) {
+    int temp_seatNumber;
+    printf("\n");
+    printf("    +------------------------------+\n");
+    printf("    |   Left      Hall     Right   |\n");
+    for(int i = 0; i < 5; i++) {
+        printf("  %d |", i + 1);
+        for(int j = 0; j < 4; j++) {
+            temp_seatNumber = (i*4) + j;
+            if (seatMatrix[temp_seatNumber].passenger != NULL) {
+                printf(" [ X ] ");
+            } else {
+                printf(" [ %c ] ", col_labels[j]);
+            }
+            if (j == 1) printf("  ");
+            if (j == 3) printf("|");
+            if (i == 0 && j == 3) printf("\t<--- Real-time Seat Map  ");
+            if (i == 2 && j == 3) printf("\tRefer to the Row Numbers (1-5) and Collumn Names (A-D)");
+            if (i == 3 && j == 3) printf("\tSeats Taken (%d/%d) ; [ X ] = Seat is taken", passenger_code, MAX_PASSENGER);
+            if (mode == 1 && i == 4 && j == 3) printf("\tSample Input: 1A");
+        }
+        printf("\n    |                              |\n");
+    }
+}
+
+int seat_convert(char *temp_seat) {
+    int seat_number;
+    if (temp_seat[1] > 'D') temp_seat[1] -= 32; // convert to uppercase
+    seat_number = ((temp_seat[0] - '1') * MAX_SEATS) + (temp_seat[1] - 'A');
+
+    return seat_number;
+}
+
+int read_char_input(char* buffer, int max_len) {
+    // definitions
+    char ch; // init
+    int index = 0;
+    // core principle (still read characters but never store them until newline)
+    while ((ch = getchar()) != EOF) {
+        if (ch == '\n') {
+            if (index == 0) {
+                do {
+                    ch = getchar();
+                } while (ch == '\n');
+            } else {
+                break;
+            }
+        } 
+        
+        if (index < max_len) {// assignment
+            buffer[index] = ch;
+            index++;  
+        }
+    }
+    buffer[index] = '\0';
+    return index;
+}
+
+int read_int_input(int* number) {
+    // definitions
+    int has_char = 0;
+    char ch;
+    int digit;
+    int converted_number = 0;
+    int place_value = 1;
+    // core principle (still read characters but never store them until newline)
+    while ((ch = getchar()) != EOF) {
+        if (ch == '\n') {
+            if (has_char == 0) {
+                do {
+                ch = getchar();
+                } while (ch == '\n');
+            } else {
+                break;
+            }
+        }
+        
+        if (ch >= '0' && ch <= '9') {
+            digit = ch - '0';
+            converted_number = (converted_number*place_value) + digit;
+            place_value *= 10;
+            has_char = 1;
+        }
+        else {
+            *number = 0;
+            has_char = 1;
+        }
+    }
+    *number = converted_number;
+    return 1;
+}
+
+void init_seatMatrix () {
+    // contains: 4 seats per row (5 rows)
+    // objective: initialize seatNumber in 1D array format, and passenger = 0;
+    int seat_no = 0;
+    for(int i = 0; i < MAX_ROWS*MAX_SEATS; i++) {
+            seatMatrix[i].seatNumber = seat_no;
+            seatMatrix[i].passenger = NULL;
+            seat_no++;
+    }
+}   
+
+void init_flight_details() {
+        helper_copy("SK180", current_flight.code, MAX_STRING);
+        helper_copy("2025-05-27", current_flight.date, MAX_STRING);
+        helper_copy("08:45 AM", current_flight.time, MAX_STRING);
+        helper_copy("MNL", current_flight.from, MAX_STRING);
+        helper_copy("CEB", current_flight.to, MAX_STRING);
+        helper_copy("5", current_flight.gate, MAX_STRING);
+        helper_copy("08:15 AM", current_flight.boarding_time, MAX_STRING);
+ 
+}
+
+int check_string_equality(const char* string_1, const char* string_2, int len) {
+    int wrong = 0;
+    char conv = '\0';
+    char conv_2 = '\0';
+    for (int i = 0; i < len; i++) {
+        // convert uppercase
+        if (string_1[i] > 'Z') {
+            conv = string_1[i] - 32;
+        } else {
+            conv =  string_1[i];
+        }
+
+        if (string_2[i] > 'Z') {
+            conv_2 = string_2[i] - 32;
+        } else {
+            conv_2 =  string_2[i];
+        }
+
+        if (conv != conv_2) wrong++;
+        if ((string_1[i] == '\0' && string_2[i] == '\0') && wrong == 0) return 1;
+    }
+    return 0;
+}
+
+void show_menu(int mode) {
+    printf("\n");
+    printf("\n  ---------------------------------------------------------------------------\n");
+    printf("      _    ___ ____  _     ___ _   _ _____                                   \n");
+    printf("     / \\  |_ _|  _ \\| |   |_ _| \\ | | ____|                                  \n");
+    printf("    / _ \\  | || |_) | |    | ||  \\| |  _|                                    \n");
+    printf("   / ___ \\ | ||  _ <| |___ | || |\\  | |___                                   \n");
+    printf("  /_/__ \\_\\___|_| \\_\\_____|___|_| \\_|_____|___ ____      _  _____ ___  ____  \n");
+    printf("  / ___|| ____|  / \\|_   _|  / _ \\|  _ \\| ____|  _ \\    / \\|_   _/ _ \\|  _ \\ \n");
+    printf("  \\___ \\|  _|   / _ \\ | |   | | | | |_) |  _| | |_) |  / _ \\ | || | | | |_) |\n");
+    printf("   ___) | |___ / ___ \\| |   | |_| |  __/| |___|  _ <  / ___ \\| || |_| |  _ < \n");
+    printf("  |____/|_____/_/   \\_\\_|    \\___/|_|   |_____|_| \\_\\/_/   \\_\\_| \\___/|_| \\_\\\n");
+    printf("\n");
+
+    switch(mode){
+        case 1:{ 
+            printf("  [ AIRLINE SEAT OPERATOR ]: ONLINE\n");  // headings
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  | BOOT\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  [1] New Flight / Current Flight\n  [2] Load Flight\n  [3] How to Use\n  [4] About\n  [5] Exit\n");
+            break;
+        }
+        case 2:{
+            printf("  [ AIRLINE SEAT OPERATOR ]: ONLINE\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  | BOOT > NEW FLIGHT\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  [1] Passenger\n  [2] Admin\n  [3] Return to Main Menu\n");
+            break;
+        }
+        case 3: {
+            printf("  [ AIRLINE SEAT OPERATOR ]: ONLINE\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  | BOOT > NEW FLIGHT > PASSENGER\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  [1] Select / Reserve Seat\n  [2] Edit Seats\n  [3] Back\n");
+            break;
+        }
+        case 4:{
+            printf("  [ AIRLINE SEAT OPERATOR ]: ONLINE\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  | BOOT > NEW FLIGHT > PASSENGER > EDIT >\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  [1] Cancel Seat\n  [2] Change Seat\n  [3] Back\n");
+        break;
+        }
+        case 5:{
+            printf("  [ AIRLINE SEAT OPERATOR ]: ONLINE\n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  | BOOT > NEW FLIGHT > ADMIN \n");
+            printf("  ---------------------------------------------------------------------------\n");
+            printf("  [1] Reset Seats\n  [2] Passenger Details\n  [3] Change Flight Details\n  [4] Export Flight Database (CSV)\n  [5] Back\n");
+        break;
+        }
+    }
+}
+
+int main() {
+    int choice_1;
+    char nQuit; 
+    do {
+        show_menu(1);
+        printf("\n  > enter choice : ");
+        choice_1 = -1;
+        read_int_input(&choice_1);
+
+        switch(choice_1) {
+            case 1:{
+                init_seatMatrix(); // init new seatMatrix
+                init_flight_details(); // init new flightDetails
+                passenger_code = 0;
+                int flag_1 = 1;
+                do {
+                    show_menu(2);
+                    printf("\n  > enter choice : ");
+                    choice_1 = -1;
+                    read_int_input(&choice_1);
+                        switch (choice_1) {
+                            case 1:
+                                handle_passenger();
+                                break;
+                            case 2:
+                                handle_admin();
+                                break;  
+                            case 3:
+                                flag_1 = 0;
+                                break;
+                        default:
+                            printf("  > invalid input; press enter to try again\n");
+                            getchar();
+                            }
+                } while (flag_1 == 1);
+                break;
+            }
+            case 2:{
+                import_as_csv(&current_flight, &passenger_list); // init new seatMatrix, init new flightDetails
+                int flag_1 = 1;
+                do {
+                    show_menu(2);
+                    printf("\n  > enter choice : ");
+                    choice_1 = -1;
+                    read_int_input(&choice_1);
+                        switch (choice_1) {
+                            case 1:
+                                handle_passenger();
+                                break;
+                            case 2:
+                                handle_admin();
+                                break;  
+                            case 3:
+                                flag_1 = 0;
+                                break;
+                        default:
+                            printf("  > invalid input; press enter to try again\n");
+                            getchar();
+                            }
+                } while (flag_1 == 1);
+                break;
+            }
+            case 3: {
+                break;
+            }
+            case 4: {
+                printf("  -------------------------------------------------------------------\n");
+                printf("  | Description : This machine project is an Airline Seat Operator  |\n");
+                printf("  |  Author : Sean Russell B. Villeza                               |\n");
+                printf("  |  Section : 1-5                                                  |\n");
+                printf("  |  Last Modified : 05/29/2025                                     |\n");
+                printf("  |  Acknowledgments: Submitted to sir Arnie Fabregas               |\n");
+                printf("  -------------------------------------------------------------------\n");
+                printf("  > Press enter to continue");
+                getchar();
+                break;
+            }
+            case 5:{
+                printf("\n  : Would you like to exit Airline Seat Operator?");
+                printf("\n  : [Y] Yes [N] No");
+                printf("\n\n  > enter choice : ");
+                read_char_input(&nQuit, 1);
+                    if (nQuit == 'Y' || nQuit == 'y') {
+                        free(passenger_list);
+                        return 0;
+                    }
+                break;
+            }
+            default:{
+                printf("\n  > invalid input; press enter to try again\n");
+                getchar();
+            }
+        }
+    
+    } while (1);
+}

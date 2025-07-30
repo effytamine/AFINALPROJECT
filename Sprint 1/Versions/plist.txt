@@ -1,0 +1,46 @@
+
+  =========================
+    AIRLINE FLIGHT REPORT
+  =========================
+
+  Carrier             :	 Small Airplane      
+  Flight no.          :	 SK180               
+  Flight Date         :	 2025-05-27          
+  Report Time         :	 08:45 AM            
+  Seats Total         :	 20   
+  Seats Occupied      :	 1    
+  Seats Available     :	 19   
+
+  -------------------------------------
+  	PASSENGER MASTERLIST
+  -------------------------------------
+
+  | No.   | Seat     | Passenger Name            | Age   | Home Address                                        |
+  | ----- | -------- | ------------------------- | ----- | --------------------------------------------------  |
+  | 1     | 2B       | Jane Doe                  | 19    | Espana, Manila                                      |
+
+  -------------------------------------
+            SEATING LAYOUT
+  -------------------------------------
+
+    +------------------------------+
+    |   Left      Hall     Right   |
+  1 | [ A ]  [ B ]    [ C ]  [ D ] |
+    |                              |
+  2 | [ A ]  [ X ]    [ C ]  [ D ] |
+    |                              |
+  3 | [ A ]  [ B ]    [ C ]  [ D ] |
+    |                              |
+  4 | [ A ]  [ B ]    [ C ]  [ D ] |
+    |                              |
+  5 | [ A ]  [ B ]    [ C ]  [ D ] |
+    |                              |
+
+
+  --------------------------------------------------------------------
+  |  Description : This machine project is an Airline Seat Operator  |
+  |  Author : Sean Russell B. Villeza                                |
+  |  Section : 1-5                                                   |
+  |  Last Modified : 05/29/2025                                      |
+  |  Acknowledgments: Submitted to sir Arnie Fabregas                |
+  --------------------------------------------------------------------

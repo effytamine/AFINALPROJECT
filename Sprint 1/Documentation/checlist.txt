@@ -1,0 +1,110 @@
+function list
+// Linked List & Passenger Management
+    int helper_copy(const char* o_string, char* buffer, int max_len);
+    struct node* create_node();
+    struct node* create_passenger(int seatNumber, char* name, int age, char* street, char* city, int p_code);
+    struct node* traverse_list(struct node* tempnode);
+    void append_node(struct node* head, struct node* new_passenger);
+    struct node* find_node(struct node* head, const int code);
+    void remove_node(struct node** head, struct node* obj_address);
+
+// UI/Menu Functions
+    void show_menu(int mode);
+    void init_seatMatrix ();
+
+// Utility
+    void init_seatMatrix ();
+
+// data structures listed
+    a. definitions
+        MAX_NAME_LEN
+        MAX_STREET_LEN
+        MAX_CITY_LEN
+        MAX_SEATS
+        MAX_ROWS
+    b. structs
+        n_passenger
+            - int seatNumber
+            - char name [MAX_NAME_LEN]
+            - int age
+            - char street [MAX_STREET_LEN]
+            - char city [MAX_CITY_LEN]
+            - int p_code
+        n_seat
+            - int seatNumber
+            - int passenger
+        node
+            - n_passenger* passenger
+            - node* link
+    c. global variables
+        n_seat seatMatrix [5][4]
+    d. function variables
+        on helper_copy
+            - const char* o_string
+            - char* buffer
+            - int max_len
+        on create_node
+            - node* temp
+        on create_passenger
+            - int seatNumber 
+            - char* name 
+            - int age 
+            - char* street 
+            - char* city 
+            - int p_code
+            - node* new_passenger
+            - n_passenger* passenger;
+        on traverse_list
+            - node* tempnode
+        on append_node 
+            - node* head
+            - node* new_passenger
+            - node* last_node 
+            - node* temp
+        on find_node
+            - node* head
+            - const int code
+            - node* current_node
+        on remove_node 
+            - node** head
+            - node* obj_address
+            - node* previous_node
+            - node* current_node
+        on show_menu
+            - int mode
+        on init_seatMatrix
+            - seat_no
+        
+        on main
+            - int choice_1
+            - char nQuit
+            - 
+
+// data strucutres unlisted
+    tba
+
+// functions unlisted
+    tba
+
+//reusables
+printf("\n  > enter choice : ");
+
+default:
+    printf("  > invalid input; press enter to try again\n");
+    getchar();
+
+checklist;
+2:17pm      23/05/2025      data structures needed are done
+2:17pm      23/05/2025      node operations needed are done
+2:17pm      23/05/2025      seat matrix init is done
+12:37am     24/05/2025      time in
+
+notes;
+seatrows and seats are a separate object from a passenger, should not be integrated within each other 
+txt printing
+the definition of NULL varies per variable type
+pointers are like packages and collapse to a copy of addresses
+struct access varies per variable type
+struct variable type is optional
+edge cases (if null, going out of bounds, memory check, infinite loops)
+

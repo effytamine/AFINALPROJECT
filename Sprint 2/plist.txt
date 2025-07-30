@@ -1,0 +1,38 @@
+
+  -------------------------------
+> AIRLINE FLIGHT REPORT
+  -------------------------------
+  Carrier               :	Small Airplane      
+  Flight No.            :	SK180               
+  Flight Date           :	2025-05-27          
+  Seats Total           :	20
+  Seats Occupied        :	1
+  Seats Available       :	19
+  -------------------------------
+	 PASSENGER MASTERLIST
+  -------------------------------
+
+  | No.   | Seat     | Passenger Name            | Age   | Home Address                                        |
+  | ----- | -------- | ------------------------- | ----- | --------------------------------------------------  |
+  | 1     | 1B       | SEAN                      | 2     | HS, SDS                                             |
+
+	> SEAT MAP
+   -------------------------------
+
+        Left   Hall  Right
+    1 > [A] [X]    [C] [D] 
+    2 > [A] [B]    [C] [D] 
+    3 > [A] [B]    [C] [D] 
+    4 > [A] [B]    [C] [D] 
+    5 > [A] [B]    [C] [D] 
+
+   -------------------------------
+
+
+  --------------------------------------------------------------------
+  |  Description : This machine project is an Airline Seat Operator  |
+  |  Author : Sean Russell B. Villeza                                |
+  |  Section : 1-5                                                   |
+  |  Last Modified : 06/21/2025                                      |
+  |  Acknowledgments: Submitted to sir Arnie Fabregas                |
+  --------------------------------------------------------------------
